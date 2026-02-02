@@ -21,7 +21,7 @@ pub struct Args {
     pub max_height: Option<u32>,
 
     /// Edge detection threshold (0.0 - 1.0)
-    #[arg(short = 'e', long = "edge-threshold", default_value_t = 0.3)]
+    #[arg(short = 'e', long = "edge-threshold", default_value_t = 0.4)]
     pub edge_threshold: f32,
 
     /// Character aspect ratio
@@ -86,7 +86,7 @@ impl From<Args> for Settings {
             file_path: args.file_path,
             max_width,
             max_height,
-            edge_threshold: args.edge_threshold,
+            edge_threshold: args.edge_threshold.clamp(0.0, 1.0),
             char_ratio: args.char_ratio,
             show_stats: args.show_stats,
         }
