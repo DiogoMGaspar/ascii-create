@@ -1,6 +1,7 @@
 use clap::Parser;
-use terminal_size::{terminal_size, Width, Height};
+use crossterm::terminal::size;
 
+/// The arguments a user can provide to the program
 #[derive(Debug, Parser)]
 #[command(
     version = "0.1.0",
@@ -36,6 +37,7 @@ pub struct Args {
     pub show_stats: bool,
 }
 
+/// All the processed settings that came from the program arguments
 #[derive(Debug)]
 pub struct Settings {
     /// Path to the image file
@@ -67,7 +69,7 @@ impl From<Args> for Settings {
 
         // Give precedence to width and height values provided manually
         if args.fit_terminal {
-            if let Some((Width(w), Height(h))) = terminal_size() {
+            if let Ok((w, h)) = size() {
                 if max_width.is_none() {
                     max_width = Some(w as u32);
                 }
@@ -93,6 +95,5 @@ impl From<Args> for Settings {
 
 /// Parse the CLI arguments and resolve them into Settings
 pub fn parse_args() -> Settings {
-    let args = Args::parse();
-    args.into()
+    Args::parse().into()
 }
