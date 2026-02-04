@@ -1,5 +1,16 @@
 use clap::Parser;
+use clap::ValueEnum;
 use crossterm::terminal::size;
+use image::imageops::FilterType;
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum ResizeFilter {
+    Nearest,
+    Triangle,
+    CatmullRom,
+    Gaussian,
+    Lanczos3,
+}
 
 /// The arguments a user can provide to the program
 #[derive(Debug, Parser)]
@@ -28,6 +39,10 @@ pub struct Args {
     #[arg(short = 'c', long = "char-ratio", default_value_t = 2.0)]
     pub char_ratio: f32,
 
+    /// The filter to be used when resizing the image
+    #[arg(long = "filter", value_enum, default_value_t = ResizeFilter::Lanczos3)]
+    pub filter: ResizeFilter,
+
     /// Try to scale the image so as to fit the terminal's dimensions
     #[arg(long = "fit-terminal")]
     pub fit_terminal: bool,
@@ -55,8 +70,24 @@ pub struct Settings {
     /// Character aspect ratio
     pub char_ratio: f32,
 
+    /// The filter to be used when resizing the image
+    pub filter: FilterType,
+
     /// Show processing stats
     pub show_stats: bool,
+}
+
+impl From<ResizeFilter> for image::imageops::FilterType {
+    fn from(f: ResizeFilter) -> Self {
+        use image::imageops::FilterType::*;
+        match f {
+            ResizeFilter::Nearest => Nearest,
+            ResizeFilter::Triangle => Triangle,
+            ResizeFilter::CatmullRom => CatmullRom,
+            ResizeFilter::Gaussian => Gaussian,
+            ResizeFilter::Lanczos3 => Lanczos3,
+        }
+    }
 }
 
 impl From<Args> for Settings {
@@ -89,6 +120,7 @@ impl From<Args> for Settings {
             edge_threshold: args.edge_threshold.clamp(0.0, 1.0),
             char_ratio: args.char_ratio,
             show_stats: args.show_stats,
+            filter: args.filter.into(),
         }
     }
 }

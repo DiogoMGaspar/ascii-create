@@ -10,19 +10,38 @@ use std::io::{self, Write};
 
 const ASCII_CHARS: &[u8] = b" .-=+*x#$&X@";
 
+/// Representation of a pixel in ASCII
+pub struct AsciiPixel {
+    /// Character
+    pub ch: u8,
+
+    /// Red value
+    pub r: u8,
+
+    /// Green value
+    pub g: u8,
+
+    /// Blue value
+    pub b: u8,
+}
+
 /// Fully processed image
 pub struct ProcessedImage {
-    /// Data of the image
-    pub image: image::RgbImage,
+    /// Width of the image
+    pub width: u32,
 
-    /// Luminance values of the image
-    pub luminance: Vec<f32>,
+    /// Height of the image
+    pub height: u32,
 
-    /// Magnitude of the edge
-    pub edges: Vec<f32>,
+    /// Pixel data
+    pub pixels: Vec<AsciiPixel>,
+}
 
-    /// Angle of the edge
-    pub angles: Vec<f32>,
+/// Attempts to load the image from a file
+pub fn load_image(file_path: &str, show_stats: bool) -> Result<DynamicImage> {
+    let image = time!(image::open(file_path)?, "Loading the image", show_stats);
+
+    Ok(image)
 }
 
 /// Calculates the dimensions the image should be resized to
@@ -33,33 +52,23 @@ fn calculate_dimensions(
     max_height: u32,
     char_ratio: f32,
 ) -> (u32, u32) {
-    let image_width = image_width as f32;
-    let image_height = image_height as f32;
-    let max_width = max_width as f32;
-    let max_height = max_height as f32;
+    let iw = image_width as f32;
+    let ih = image_height as f32;
+    let mw = max_width as f32;
+    let mh = max_height as f32;
 
-    let new_height = (image_height * max_width) / (char_ratio * image_width);
+    let new_height = ih * mw / (char_ratio * iw);
 
-    if new_height <= max_height {
-        (max_width as u32, new_height as u32)
+    if new_height <= mh {
+        (max_width, new_height.round() as u32)
     } else {
-        let width = (char_ratio * image_width * max_height) / image_height;
-        (width as u32, max_height as u32)
+        let width = char_ratio * iw * mh / ih;
+        (width.round() as u32, max_height)
     }
-}
-
-/// Attempts to load the image from a file
-pub fn load_image(file_path: &str, show_stats: bool) -> Result<DynamicImage> {
-    let image = time!(show_stats, "Loading image", image::open(file_path)?);
-
-    Ok(image)
 }
 
 /// Resizes an image to the correct number of characters
 pub fn resize_image(image: &DynamicImage, settings: &Settings) -> DynamicImage {
-    // If performance is an issue, using a different filter is recommended
-    let filter = image::imageops::FilterType::Lanczos3;
-
     let (width, height) = image.dimensions();
 
     let (new_width, new_height) = calculate_dimensions(
@@ -69,25 +78,26 @@ pub fn resize_image(image: &DynamicImage, settings: &Settings) -> DynamicImage {
         settings.max_height,
         settings.char_ratio,
     );
-
+    
     time!(
-        settings.show_stats,
-        "Resizing image",
-        image.resize_exact(new_width, new_height, filter)
+        image.resize_exact(new_width, new_height, settings.filter),
+        "Resizing the image",
+        settings.show_stats
     )
 }
 
 /// Gets the luminance of an image
-fn get_luminance(image: &image::RgbImage) -> Vec<f32> {
+pub fn get_luminance(image: &image::RgbImage) -> Vec<f32> {
+    let mut luminance = Vec::with_capacity((image.width() * image.height()) as usize);
+
     // Using Rec. 709 luminance
-    image
-        .pixels()
-        .map(|p| {
-            let [r, g, b] = p.0;
-            let y = (0.2126 * r as f32 + 0.7152 * g as f32 + 0.0722 * b as f32) / 255.0;
-            y.clamp(0.0, 1.0)
-        })
-        .collect()
+    for pixel in image.pixels() {
+        let [r, g, b] = pixel.0;
+        let luma = (0.2126 * r as f32 + 0.7152 * g as f32 + 0.0722 * b as f32) / 255.0;
+        luminance.push(luma.clamp(0.0, 1.0));
+    }
+
+    luminance
 }
 
 /// Applies the Sobel operator over an image
@@ -136,81 +146,110 @@ fn sobel(luminance: &[f32], width: u32, height: u32) -> (Vec<f32>, Vec<f32>) {
     (magnitude, angle)
 }
 
-/// Processes an image
-pub fn process_image(image: &DynamicImage, show_stats: bool) -> ProcessedImage {
-    let rgb = time!(show_stats, "Converting to RGB", image.to_rgb8());
+/// Convert the given data into the adequate ASCII characters and colours
+fn to_ascii(
+    image: &image::RgbImage,
+    luminance: Vec<f32>,
+    edges: Vec<f32>,
+    angles: Vec<f32>,
+    edge_threshold: f32,
+) -> Vec<AsciiPixel> {
+    let (width, height) = (image.width() as usize, image.height() as usize);
+    let length = width * height;
+    let mut pixels = Vec::with_capacity(length);
 
-    let luminance = time!(show_stats, "Getting the luminance", get_luminance(&rgb));
+    for i in 0..(length) {
+        let x = i % width;
+        let y = i / width;
+
+        let p = image.get_pixel(x as u32, y as u32);
+        let [r, g, b] = p.0;
+
+        let c = if edges[i] >= edge_threshold {
+            edge_char(angles[i])
+        } else {
+            luminance_to_char(luminance[i])
+        };
+
+        pixels.push(AsciiPixel { ch: c, r, g, b });
+    }
+
+    pixels
+}
+
+/// Processes an image
+pub fn process_image(
+    image: &DynamicImage,
+    edge_threshold: f32,
+    show_stats: bool,
+) -> ProcessedImage {
+    let rgb = time!(image.to_rgb8(), "Converting to RGB", show_stats);
+
+    let (width, height) = (rgb.width(), rgb.height());
+
+    let luminance = time!(get_luminance(&rgb), "Getting the luminance", show_stats);
 
     let (edges, angles) = time!(
-        show_stats,
+        sobel(&luminance, rgb.width(), rgb.height()),
         "Sobel operator",
-        sobel(&luminance, rgb.width(), rgb.height())
+        show_stats
+    );
+
+    let pixels = time!(
+        to_ascii(&rgb, luminance, edges, angles, edge_threshold),
+        "Converting to ASCII",
+        show_stats
     );
 
     ProcessedImage {
-        image: rgb,
-        luminance,
-        edges,
-        angles,
+        width,
+        height,
+        pixels,
     }
 }
 
 /// Convert a luminance value to its respective character
 #[inline]
-fn luminance_to_char(luminance: f32) -> char {
+fn luminance_to_char(luminance: f32) -> u8 {
     let i = (luminance * (ASCII_CHARS.len() - 1) as f32) as usize;
-    ASCII_CHARS[i] as char
+    ASCII_CHARS[i]
 }
 
 /// Gets the appropriate edge character based off the angle
-fn edge_char(angle: f32) -> char {
+fn edge_char(angle: f32) -> u8 {
     let a = (angle + std::f32::consts::PI) % (2.0 * std::f32::consts::PI);
 
     match ((a / std::f32::consts::FRAC_PI_4).round() as i32) & 3 {
-        0 => '|',
-        1 => '\\',
-        2 => '_',
-        _ => '/',
+        0 => b'|',
+        1 => b'\\',
+        2 => b'_',
+        _ => b'/',
     }
 }
 
-/// Prints an image as ASCII
-pub fn print_image(image: &ProcessedImage, edge_threshold: f32) -> io::Result<()> {
-    let width = image.image.width() as usize;
-    let height = image.image.height() as usize;
-
+/// Prints an image as ASCII characters
+pub fn print_image(image: &ProcessedImage) -> io::Result<()> {
     let mut stdout = io::BufWriter::new(io::stdout());
 
-    let mut last_color = None;
+    let width = image.width as usize;
+    let height = image.height as usize;
 
     for y in 0..height {
         let row = y * width;
 
         for x in 0..width {
             let i = row + x;
-            let pixel = image.image.get_pixel(x as u32, y as u32);
-            let color = (pixel[0], pixel[1], pixel[2]);
+            let pixel = &image.pixels[i];
 
-            if last_color != Some(color) {
-                stdout.queue(SetForegroundColor(Color::Rgb {
-                    r: color.0,
-                    g: color.1,
-                    b: color.2,
-                }))?;
-                last_color = Some(color);
-            }
+            stdout.queue(SetForegroundColor(Color::Rgb {
+                r: pixel.r,
+                g: pixel.g,
+                b: pixel.b,
+            }))?;
 
-            let c = if image.edges[i] >= edge_threshold {
-                edge_char(image.angles[i])
-            } else {
-                luminance_to_char(image.luminance[i])
-            };
-
-            stdout.queue(Print(c))?;
+            stdout.queue(Print(pixel.ch as char))?;
         }
         stdout.queue(Print('\n'))?;
-        last_color = None;
     }
 
     stdout.queue(style::ResetColor)?;

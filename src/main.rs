@@ -12,13 +12,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let resized = resize_image(&image, &settings);
 
-    let processed = process_image(&resized, settings.show_stats);
+    let processed = process_image(&resized, settings.edge_threshold, settings.show_stats);
 
-    time!(
-        true,
-        "Print",
-        print_image(&processed, settings.edge_threshold)?
-    );
+    print_image(&processed)?;
 
     Ok(())
 }

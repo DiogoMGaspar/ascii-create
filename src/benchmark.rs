@@ -1,7 +1,7 @@
 /// Benchmarks the given function call if the "show-stats" flag was selected
 #[macro_export]
 macro_rules! time {
-    ($show_stats:expr, $label:expr, $body:expr) => {{
+    ($body:expr, $label:expr, $show_stats:expr) => {{
         if $show_stats {
             let start = std::time::Instant::now();
             let result = $body;
