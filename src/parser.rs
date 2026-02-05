@@ -98,7 +98,7 @@ impl From<Args> for Settings {
         let mut max_width = args.max_width;
         let mut max_height = args.max_height;
 
-        // Give precedence to width and height values provided manually
+        // Giving precedence to width and height values provided manually
         if args.fit_terminal {
             if let Ok((w, h)) = size() {
                 if max_width.is_none() {

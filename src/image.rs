@@ -10,7 +10,7 @@ use std::io::{self, Write};
 
 const ASCII_CHARS: &[u8] = b" .-=+*x#$&X@";
 
-/// Representation of a pixel in ASCII
+/// ASCII representation of a pixel
 pub struct AsciiPixel {
     /// Character
     pub ch: u8,
@@ -37,7 +37,7 @@ pub struct ProcessedImage {
     pub pixels: Vec<AsciiPixel>,
 }
 
-/// Attempts to load the image from a file
+/// Attempts to load an image from a file
 pub fn load_image(file_path: &str, show_stats: bool) -> Result<DynamicImage> {
     let image = time!(image::open(file_path)?, "Loading the image", show_stats);
 
@@ -78,7 +78,7 @@ pub fn resize_image(image: &DynamicImage, settings: &Settings) -> DynamicImage {
         settings.max_height,
         settings.char_ratio,
     );
-    
+
     time!(
         image.resize_exact(new_width, new_height, settings.filter),
         "Resizing the image",
@@ -102,7 +102,7 @@ pub fn get_luminance(image: &image::RgbImage) -> Vec<f32> {
 
 /// Applies the Sobel operator over an image
 ///
-/// Gets the magnitude and angle of the edges of an image
+/// Gets the magnitude and angle of the edges of the image
 fn sobel(luminance: &[f32], width: u32, height: u32) -> (Vec<f32>, Vec<f32>) {
     let width = width as usize;
     let height = height as usize;
@@ -149,29 +149,30 @@ fn sobel(luminance: &[f32], width: u32, height: u32) -> (Vec<f32>, Vec<f32>) {
 /// Convert the given data into the adequate ASCII characters and colours
 fn to_ascii(
     image: &image::RgbImage,
-    luminance: Vec<f32>,
-    edges: Vec<f32>,
-    angles: Vec<f32>,
+    luminance: &[f32],
+    edges: &[f32],
+    angles: &[f32],
     edge_threshold: f32,
 ) -> Vec<AsciiPixel> {
     let (width, height) = (image.width() as usize, image.height() as usize);
     let length = width * height;
     let mut pixels = Vec::with_capacity(length);
 
-    for i in 0..(length) {
-        let x = i % width;
-        let y = i / width;
+    let raw = image.as_raw();
 
-        let p = image.get_pixel(x as u32, y as u32);
-        let [r, g, b] = p.0;
+    for i in 0..length {
+        let base = i * 3;
+        let r = raw[base];
+        let g = raw[base + 1];
+        let b = raw[base + 2];
 
-        let c = if edges[i] >= edge_threshold {
+        let ch = if edges[i] >= edge_threshold {
             edge_char(angles[i])
         } else {
             luminance_to_char(luminance[i])
         };
 
-        pixels.push(AsciiPixel { ch: c, r, g, b });
+        pixels.push(AsciiPixel { ch, r, g, b });
     }
 
     pixels
@@ -196,7 +197,7 @@ pub fn process_image(
     );
 
     let pixels = time!(
-        to_ascii(&rgb, luminance, edges, angles, edge_threshold),
+        to_ascii(&rgb, &luminance, &edges, &angles, edge_threshold),
         "Converting to ASCII",
         show_stats
     );
