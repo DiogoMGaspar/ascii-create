@@ -24,11 +24,11 @@ pub struct Args {
     pub file_path: String,
 
     /// Maximum width of the ASCII output
-    #[arg(short = 'm', long = "max-width")]
+    #[arg(short = 'W', long = "max-width")]
     pub max_width: Option<u32>,
 
     /// Maximum height of the ASCII output
-    #[arg(short = 'n', long = "max-height")]
+    #[arg(short = 'H', long = "max-height")]
     pub max_height: Option<u32>,
 
     /// Edge detection threshold (0.0 - 1.0)
