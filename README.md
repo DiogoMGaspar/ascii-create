@@ -2,7 +2,7 @@
 
 # ASCII Create
 
-A terminal-based image-to-ASCII converter written in Rust.
+A cross-platform terminal-based image-to-ASCII converter written in Rust.
 
 <img width="1024" height="768" alt="cover-photo" src="https://github.com/user-attachments/assets/c62a480c-8749-44a6-a939-d837f0aebdc1" />
 
@@ -41,5 +41,6 @@ The tool exposes several command-line options that let you control the output si
 - Choose the image resizing filter
 - Automatically scale the image to fit your terminal
 - Display processing statistics for debugging or benchmarking
+
 
 Make sure to use the **-h** or **--help** flags for more information on how to use the tool.
