@@ -3,9 +3,10 @@ mod image;
 mod parser;
 
 use crate::image::{load_image, print_image, process_image, resize_image};
+use anyhow::Result;
 use parser::parse_args;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<()> {
     let settings = parse_args();
 
     let image = load_image(&settings.file_path, settings.show_stats)?;
