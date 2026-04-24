@@ -16,16 +16,14 @@ A cross-platform terminal-based image-to-ASCII converter written in Rust.
 
 ## How to use
 
-You have to be able to run and compile Rust code, so using **rustup** is recommended.
-
-Compiling the project in release mode is highly encouraged, as the **image** crate is significantly slower in debug builds due to disabled optimizations. As such, you should do the following:
+Compiling the project in release mode is highly encouraged, as the **image** crate is significantly slower in debug builds. As such, you should do the following:
 
 ```
 cargo build --release
 ./target/release/ascii-create <file_path> [options]
 ```
 
-Additionally, to compile and run the project:
+To compile and run the project:
 
 ```
 cargo run --release -- <file_path> [options]
